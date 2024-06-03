@@ -295,7 +295,9 @@ export class ElectionsController {
 		}
 
 		const ballots = await this.electionsService.getBallots(current.uuid);
-		const candidates = await this.electionsService.queryCandidates({});
+		const candidates = await this.electionsService.queryCandidates({
+			election: current.uuid,
+		});
 
 		const chiefCandidatesIndices = [];
 		const chiefCandidatesNames = {};
@@ -359,17 +361,21 @@ export class ElectionsController {
 			speakerBallots,
 		);
 
+		this.electionsService.saveElectionLog('chief', chiefResults.log);
+
+		this.electionsService.saveElectionLog('speaker', speakerResults.log);
+
 		if (chiefResults.winner === null || speakerResults.winner === null) {
 			console.error('No winner was found', chiefResults, speakerResults);
 
 			return {
 				success: false,
+				data: {
+					chiefLog: chiefResults.log,
+					speakerLog: speakerResults.log,
+				},
 			};
 		}
-
-		this.electionsService.saveElectionLog('chief', chiefResults.log);
-
-		this.electionsService.saveElectionLog('speaker', speakerResults.log);
 
 		return {
 			data: {

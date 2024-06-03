@@ -30,7 +30,7 @@ function countNVotes(
 
 	for (const ballot of ballots) {
 		if (ballot.length > 0) {
-			totals[ballot[0]]++;
+			totals[ballot[n - 1]]++;
 		}
 	}
 
@@ -42,7 +42,6 @@ function calculateRoundWinners(totals: Totals) {
 	let maxVotes = 0;
 
 	for (const candidate in totals) {
-		// console.log(totals[candidate]);
 		const votesReceived = totals[candidate];
 
 		if (votesReceived > maxVotes) {
@@ -54,8 +53,6 @@ function calculateRoundWinners(totals: Totals) {
 			winners.push(candidate);
 		}
 	}
-
-	// console.log(winners);
 
 	return winners;
 }
@@ -115,8 +112,6 @@ function removeLoserCandidate(
 }
 
 function removeLoserFromBallots(ballots: Ballots, roundLoser) {
-	// console.log(roundLoser);
-
 	const newBallots = ballots.map((ballot) =>
 		ballot.filter((pick) => pick !== roundLoser),
 	);
@@ -140,7 +135,7 @@ export function calculateWinner(
 		log.push(
 			`: THERE ARE ${Object.keys(candidateNames).length} candidates and ${
 				ballots.length
-			} ballots.\n`,
+			} ballots.`,
 		);
 
 		const firstVotes = countFirstVotes(candidateIds, ballots);
@@ -153,17 +148,11 @@ export function calculateWinner(
 
 		log.push(`== FIRST VOTES / CANDIDATE:`);
 
-		// console.log(firstVotes);
-
 		for (const candidate of candidateIds) {
-			// console.log(candidate);
-
 			log.push(candidateNames[candidate] + ': ' + firstVotes[candidate]);
 		}
 
 		log.push('');
-
-		// console.log(roundWinners);
 
 		if (roundWinners.length === 1) {
 			log.push(
@@ -229,8 +218,6 @@ export function calculateWinner(
 			return { winner: null, winnerName: null, log };
 		}
 
-		// console.log(roundLosers);
-
 		let roundLoser = roundLosers[0];
 
 		if (roundLosers.length > 1) {
@@ -269,6 +256,10 @@ export function calculateWinner(
 						candidateNames[roundLoser] +
 						' was selected as the loser of the round.',
 				);
+			} else {
+				log.push('Tiebreaker: Tie was unresolvable!');
+
+				return { winner: null, winnerName: null, log };
 			}
 		}
 
@@ -280,8 +271,6 @@ export function calculateWinner(
 
 		candidateNames = _candidateNames;
 		candidateIds = _candidateIds;
-
-		// console.log(candidateIds, candidateNames);
 
 		ballots = removeLoserFromBallots(ballots, roundLoser);
 
