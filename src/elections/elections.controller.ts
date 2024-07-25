@@ -28,25 +28,39 @@ import { User } from '@/auth/schemas/user.schema';
 import { IsAdmin } from '@/middleware/guards/isAdmin.guard';
 import { LoggedIn } from '@/middleware/guards/loggedIn.guard';
 import * as irv from '@/utils/irv2';
+import { AuthService } from '@/auth/auth.service';
 
 @ApiTags('elections')
 @Controller('/elections')
 export class ElectionsController {
-	constructor(private electionsService: ElectionsService) {}
+	constructor(
+		private electionsService: ElectionsService,
+		private authService: AuthService,
+	) {}
 
 	@Get('/current')
-	async getCurrent() {
+	async getCurrent(@Query('allowPrevious') allowPrevious: boolean) {
 		const election = await this.electionsService.getLatest();
 
 		const latest = election?.[0];
 
-		if (
-			!election ||
-			!latest ||
-			election[0].open.valueOf() > Date.now() ||
-			election[0].end.valueOf() < Date.now()
-		) {
+		const previous = latest.end.valueOf() < Date.now() && !allowPrevious;
+		const soon = latest.open.valueOf() > Date.now();
+
+		if (!election || !latest || previous || soon) {
 			throw new NotFoundException();
+		}
+
+		if (allowPrevious) {
+			const delta = Date.now() - latest.end.valueOf();
+
+			const oneDay = 24 * 60 * 60 * 1000;
+
+			if (delta > oneDay) {
+				throw new NotFoundException(
+					'The latest election ended more than 24 hours ago',
+				);
+			}
 		}
 
 		return {
@@ -282,16 +296,27 @@ export class ElectionsController {
 	@Post('/_/result')
 	@UseGuards(IsAdmin)
 	async runElection(@Query('force') force: boolean) {
-		const current = await this.electionsService.getCurrentOpen();
+		const latest = await this.electionsService.getLatest();
 
-		if (!current) {
+		if (!latest || !latest[0]) {
 			throw new NotFoundException(
 				'There is no election currently active.',
 			);
 		}
 
-		if (Date.now() < current.start.valueOf() && !force) {
+		const current = latest[0];
+
+		if (Date.now() < current.end.valueOf() && !force) {
 			throw new BadRequestException("Voting hasn't ended");
+		}
+
+		const delta = Date.now() - current.end.valueOf();
+		const oneDay = 24 * 60 * 60 * 1000;
+
+		if (delta > oneDay) {
+			throw new NotFoundException(
+				'The latest election ended more than 24 hours ago',
+			);
 		}
 
 		const ballots = await this.electionsService.getBallots(current.uuid);
@@ -339,15 +364,13 @@ export class ElectionsController {
 			i++;
 		}
 
-		const chiefBallots = ballots.map((ballot) => ballot.chief);
-		// .map((ballot) =>
-		// 	ballot.map((pick) => chiefReversedCandidateMap[pick]),
-		// );
+		const chiefBallots = ballots
+			.map((ballot) => ballot.chief)
+			.filter((ballot) => ballot.length > 0);
 
-		const speakerBallots = ballots.map((ballot) => ballot.speaker);
-		// .map((ballot) =>
-		// 	ballot.map((pick) => speakerReversedCandidateMap[pick]),
-		// );
+		const speakerBallots = ballots
+			.map((ballot) => ballot.speaker)
+			.filter((ballot) => ballot.length > 0);
 
 		const chiefResults = irv.calculateWinner(
 			Object.keys(chiefReversedCandidateMap),
@@ -381,6 +404,42 @@ export class ElectionsController {
 			data: {
 				chief: chiefResults,
 				speaker: speakerResults,
+			},
+			success: true,
+		};
+	}
+
+	@Get('/statistics')
+	async getStatistics() {
+		const election = await this.electionsService.getVotingLenient();
+
+		if (!election) {
+			throw new NotFoundException(
+				'There is no election currently active.',
+			);
+		}
+
+		const candidates = await this.electionsService.queryCandidates({
+			election: election.uuid,
+		});
+
+		const ballots = await this.electionsService.getBallots(election.uuid);
+		const users = await this.authService.query({});
+
+		const turnout = ballots.length;
+		const eligible = users.length;
+
+		const turnoutPct = (turnout / eligible) * 100;
+
+		const timestamps = ballots.map((b) => b.createdAt.valueOf());
+
+		return {
+			data: {
+				turnout,
+				eligible,
+				percentage: turnoutPct,
+				ballots: timestamps,
+				candidates: candidates.length,
 			},
 			success: true,
 		};

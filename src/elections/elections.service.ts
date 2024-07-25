@@ -63,6 +63,24 @@ export class ElectionsService {
 		return first;
 	}
 
+	async getVotingLenient(): Promise<Election> {
+		const latest = await this.getLatest();
+
+		if (!latest || latest.length === 0) return null;
+
+		const first = latest[0];
+
+		const ONE_DAY = 1000 * 60 * 60 * 24;
+		const delta = Date.now() - first.end.valueOf();
+
+		const early = Date.now() < first.start.valueOf();
+		const late = first.end.valueOf() < Date.now() && delta > ONE_DAY;
+
+		if (!first || early || late) return null;
+
+		return first;
+	}
+
 	async getById(id: string): Promise<Election> {
 		return await this.electionModel.findOne({ uuid: id }).lean(true).exec();
 	}

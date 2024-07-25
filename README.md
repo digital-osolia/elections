@@ -9,5 +9,5 @@ The re-use of this code is strictly prohibited. All rights are reserved.
 
 ## Last updated
 
-This code was last updated for the **June 2024 Osolian General Election**. Unless otherwise stated,
+This code was last updated for the **August 2024 Osolian General Election**. Unless otherwise stated,
 it is reflective of the code used/being used in the operation of that election.
